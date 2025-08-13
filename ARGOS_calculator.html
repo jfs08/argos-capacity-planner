@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ARGOS 6X – Capacity Planner</title>
+<style>
+:root{
+  --brand:#0085AD; --brand-dark:#0E4E79;
+  --text:#2B2A29; --muted:#6b7a8c; --bg:#f5f8fb;
+  --green:#18a957; --yellow:#f0a202; --red:#da3d2a;
+  --card:#fff; --shadow:0 8px 24px rgba(0,0,0,.08);
+  --border:#e7eef7; --radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;background:linear-gradient(120deg,#e9f6fb 0%,#fff 60%);color:var(--text)}
+header{color:#fff;background:linear-gradient(135deg,var(--brand-dark),var(--brand));padding:16px 20px;box-shadow:var(--shadow)}
+.hdr{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hdr .title{margin:0;font-size:20px;font-weight:700}
+.hdr .sub{opacity:.95;font-size:13px}
+.lang{display:flex;align-items:center;gap:8px}
+select{padding:8px 10px;border-radius:10px;border:1px solid #d6e2ef;background:#fff}
+main{padding:20px 0 40px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 20px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.card h2{margin:0 0 10px 0;font-size:18px;color:var(--brand-dark)}
+.section-note{font-size:12px;color:var(--muted);margin-top:6px}
+.label{font-size:13px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.field{margin-bottom:12px}
+.row{display:flex;gap:12px}
+.row .col{flex:1}
+input[type=number],input[type=time],select.input{
+  width:100%;padding:10px 12px;border:1px solid #d8e2ee;border-radius:10px;background:#fbfdff;font-size:16px
+}
+input:focus,select.input:focus{border-color:var(--brand);outline:none}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi{padding:12px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,#fff 0%,#f3f9fc 100%)}
+.kpi .title{font-size:12px;color:var(--muted);letter-spacing:.3px;text-transform:uppercase}
+.kpi .value{font-size:22px;font-weight:700;margin-top:4px}
+.kpi .hint{font-size:12px;color:var(--muted);margin-top:6px}
+
+/* Traffic light */
+.traffic{display:flex;align-items:center;gap:10px}
+.dot{width:14px;height:14px;border-radius:50%}
+.dot.green{background:var(--green)}
+.dot.yellow{background:var(--yellow)}
+.dot.red{background:var(--red)}
+.status-msg{font-weight:700}
+
+/* Progress bar */
+.bar{height:12px;background:#e8f0f9;border-radius:999px;overflow:hidden}
+.bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--brand-dark),var(--brand))}
+
+/* Tooltip */
+.info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#eef6fb;color:#0E4E79;font-size:12px;line-height:16px;position:relative;cursor:default}
+.info .tooltip{position:absolute;left:0;top:22px;width:260px;background:#fff;color:#1b2a3a;border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;font-size:12px;line-height:1.35;opacity:0;transform:translateY(4px);pointer-events:none;transition:all .15s ease;z-index:5}
+.info:hover .tooltip{opacity:1;transform:translateY(0);pointer-events:auto}
+
+/* Visuals */
+.vis-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+.vis-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px}
+svg{width:100%;height:260px;display:block}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid var(--border);background:#f6fafc;color:#0E4E79}
+.legend{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);margin-top:6px}
+.legend span.dot{width:10px;height:10px}
+
+/* Actions */
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+button{border:none;border-radius:10px;padding:10px 14px;font-weight:700;background:linear-gradient(90deg,var(--brand-dark),var(--brand));color:#fff;cursor:pointer;box-shadow:var(--shadow)}
+button.secondary{background:#fff;color:var(--brand-dark);border:1px solid #d6e2ef}
+.small{font-size:12px}
+
+/* Layout helpers */
+.col-3{grid-column:span 3}
+.col-4{grid-column:span 4}
+.col-5{grid-column:span 5}
+.col-6{grid-column:span 6}
+.col-7{grid-column:span 7}
+.col-8{grid-column:span 8}
+.col-12{grid-column:span 12}
+@media (max-width:1000px){
+  .col-3,.col-4,.col-5,.col-6,.col-7,.col-8{grid-column:span 12}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+
+/* Print */
+@media print{
+  header,.no-print{display:none !important}
+  body{background:#fff}
+  .wrap{max-width:100%;padding:0 10mm}
+  .card{box-shadow:none;border:1px solid #ddd}
+  .vis-card svg{height:220px}
+  .print-summary .inputs,.print-summary .details,.print-summary .notes{display:none !important}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <div>
+      <h1 class="title" data-i18n="title">ARGOS 6X – Capacity Planner</h1>
+      <div class="sub" data-i18n="subtitle">Production demand · HE supply · SLA windows · Visual insights</div>
+    </div>
+    <div class="lang">
+      <span data-i18n="language">Language</span>
+      <select id="langSelect">
+        <option value="en" selected>English</option>
+        <option value="de">Deutsch</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="grid inputs">
+    <!-- A: Production (Demand) -->
+    <div class="card col-6">
+      <h2 data-i18n="secA">A — Production volume (demand)</h2>
+
+      <div class="row">
+        <div class="field col">
+          <div class="label" data-i18n="volumeMode">Volume input</div>
+          <select class="input" id="volumeMode">
+            <option value="day" selected data-i18n="perDay">Slides per day</option>
+            <option value="year" data-i18n="perYear">Slides per year</option>
+          </select>
+        </div>
+        <div class="field col" id="grpSlidesPerDay">
+          <div class="label" data-i18n="slidesPerDay">Slides per day</div>
+          <input type="number" class="input" id="slidesPerDay" value="2000" min="0" step="1">
+        </div>
+        <div class="field col" id="grpSlidesPerYear" style="display:none">
+          <div class="label" data-i18n="slidesPerYear">Slides per year</div>
+          <input type="number" class="input" id="slidesPerYear" value="480000" min="0" step="1">
+        </div>
+        <div class="field col" id="grpWorkdays" style="display:none">
+          <div class="label" data-i18n="workdays">Workdays per year</div>
+          <input type="number" class="input" id="workdaysPerYear" value="240" min="1" step="1">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field col">
+          <div class="label" data-i18n="hoursPerDay">Scanning hours per day (h)</div>
+          <input type="number" class="input" id="hoursPerDay" value="10" min="0" step="0.5">
+          <div class="section-note" data-i18n="hoursNote">If SLA (last done) is set, it overrides this value.</div>
+        </div>
+        <div class="field col">
+          <div class="label" data-i18n="scanSpeed">Scan speed per scanner (slides/h)</div>
+          <input type="number" class="input" id="scanSpeed" value="110" min="0" step="1">
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="title" data-i18n="kpiTarget">Daily target rate</div>
+          <div class="value" id="targetRate">–</div>
+          <div class="hint" data-i18n="kpiTargetHint">Slides per hour to finish daily volume</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiDaily">Scanners needed (daily)</div>
+          <div class="value" id="scannersDaily">–</div>
+          <div class="hint" data-i18n="kpiDailyHint">Based on daily volume</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B: HE supply -->
+    <div class="card col-6">
+      <h2 data-i18n="secB">B — Coverslipper output (HE supply)</h2>
+
+      <div class="row">
+        <div class="field col">
+          <div class="label" data-i18n="rackType">Rack type</div>
+          <select class="input" id="rackType">
+            <option value="Sakura" selected>Sakura — 20</option>
+            <option value="Leica">Leica — 30</option>
+          </select>
+        </div>
+        <div class="field col">
+          <div class="label" data-i18n="railsUsed">Rails used per scanner</div>
+          <select class="input" id="railsUsed">
+            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field col">
+          <div class="label" data-i18n="racksPerHour">Racks per hour</div>
+          <input type="number" class="input" id="racksPerHour" value="4" min="0" step="0.1">
+        </div>
+        <div class="field col">
+          <div class="label" data-i18n="rackInterval">Interval between racks (min)</div>
+          <input type="number" class="input" id="rackInterval" value="15" min="0" step="1">
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="title" data-i18n="kpiSupplyRate">Supply rate</div>
+          <div class="value" id="supplyRate">–</div>
+          <div class="hint" id="supplyBasis">–</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiSupplyScanners">Scanners needed (supply)</div>
+          <div class="value" id="scannersSupply">–</div>
+          <div class="hint" data-i18n="kpiSupplyScannersHint">To absorb supply</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C: Optional SLAs -->
+    <div class="card col-12">
+      <h2 data-i18n="secC">C — Optional SLAs (time windows)</h2>
+      <div class="row">
+        <div class="field col">
+          <div class="label" data-i18n="shiftStart">Shift start</div>
+          <input type="time" class="input" id="shiftStart" value="07:00">
+        </div>
+        <div class="field col">
+          <div class="label" data-i18n="firstDigitalBy">First slide must be ready by (optional)</div>
+          <input type="time" class="input" id="firstDigitalBy">
+        </div>
+        <div class="field col">
+          <div class="label" data-i18n="lastDoneBy">Last slide must be done by (optional)</div>
+          <input type="time" class="input" id="lastDoneBy">
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="title" data-i18n="kpiSLARate">SLA required rate</div>
+          <div class="value" id="slaRate">–</div>
+          <div class="hint" data-i18n="kpiSLARateHint">Only if 'last done by' is set</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiSLAScanners">Scanners needed (SLA)</div>
+          <div class="value" id="scannersSLA">–</div>
+          <div class="hint" data-i18n="kpiSLAScannersHint">Based on SLA rate</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiFirstETA">First digital ETA</div>
+          <div class="value" id="firstETA">–</div>
+          <div class="hint" id="firstETAhint">–</div>
+        </div>
+      </div>
+      <div class="section-note" id="slaNote">–</div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="grid">
+    <div class="card col-12">
+      <h2 data-i18n="secResults">Results</h2>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="title" data-i18n="kpiFleetRate">Fleet scan rate (daily/SLA, slides/h)</div>
+          <div class="value" id="fleetRate">–</div>
+          <div class="hint" id="fleetBasis">–</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiRec">Recommended scanners</div>
+          <div class="value" id="scannersRecommended">–</div>
+          <div class="hint" id="recHint">–</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiLoadCap">Load capacity / scanner</div>
+          <div class="value" id="loadCap">–</div>
+          <div class="hint" data-i18n="kpiLoadCapHint">Rails × 8 racks × slides/rack</div>
+        </div>
+        <div class="kpi">
+          <div class="title" data-i18n="kpiEmpty">Time until empty (from full)</div>
+          <div class="value" id="emptyAfter">–</div>
+          <div class="hint" data-i18n="kpiLoadsPerDay">Loads per day</div>
+          <div class="hint"><b id="loadsPerDay">–</b></div>
+        </div>
+      </div>
+
+      <div class="row" style="align-items:center;margin-top:12px">
+        <div style="flex:1">
+          <div class="label"><span data-i18n="trafficLight">Traffic light</span></div>
+          <div class="traffic">
+            <div class="dot" id="dot"></div>
+            <div class="status-msg" id="statusMsg">–</div>
+          </div>
+          <div class="label" style="margin-top:8px"><span data-i18n="relBar">Supply vs. fleet (relative)</span></div>
+          <div class="bar"><span id="barFill" style="width:0%"></span></div>
+          <div class="section-note" data-i18n="relNote">100% = supply equals fleet scan rate (daily/SLA)</div>
+        </div>
+        <div class="actions no-print">
+          <button id="btnPrint" title="Print / Save as PDF" data-i18n="printFull">Print / Save PDF</button>
+          <button id="btnPrintSummary" class="secondary" data-i18n="printSummary">Print summary</button>
+          <button id="btnReset" class="secondary" data-i18n="reset">Reset</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VISUALIZATION -->
+  <section class="grid">
+    <div class="card col-12">
+      <h2 data-i18n="secViz">Visualization</h2>
+      <div class="vis-grid">
+        <!-- Bars -->
+        <div class="vis-card col-12">
+          <div class="label" style="justify-content:space-between;align-items:center">
+            <div>
+              <b data-i18n="vizBars">Bars — Supply vs. Fleet (slides/h)</b>
+              <span class="badge" id="badgeSLA" style="display:none">SLA‑driven</span>
+            </div>
+          </div>
+          <svg id="svgBars" viewBox="0 0 700 260" aria-label="Bars"></svg>
+          <div class="legend">
+            <span class="dot" style="background:var(--brand-dark)"></span><span data-i18n="legendFleet">Fleet rate</span>
+            <span class="dot" style="background:var(--brand)"></span><span data-i18n="legendSupply">Supply rate</span>
+          </div>
+        </div>
+
+        <!-- Donut -->
+        <div class="vis-card col-4">
+          <b data-i18n="vizDonut">Gauge — Utilization (supply/fleet)</b>
+          <svg id="svgDonut" viewBox="0 0 260 260" aria-label="Gauge"></svg>
+        </div>
+
+        <!-- Timeline -->
+        <div class="vis-card col-8">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <b data-i18n="vizTimeline">Timeline — Cumulative supply vs. scan</b>
+            <div class="small" id="timelineLabel">–</div>
+          </div>
+          <svg id="svgTimeline" viewBox="0 0 700 260" aria-label="Timeline"></svg>
+          <div class="legend">
+            <span class="dot" style="background:var(--brand-dark)"></span><span data-i18n="legendScanCum">Cumulative scan</span>
+            <span class="dot" style="background:var(--brand)"></span><span data-i18n="legendSupplyCum">Cumulative supply</span>
+            <span class="dot" style="background:var(--red)"></span><span data-i18n="legendBacklog">Backlog area</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Notes -->
+  <section class="grid notes">
+    <div class="card col-12">
+      <h2 data-i18n="secNotes">Notes & consistency</h2>
+      <div id="consistency" class="section-note">–</div>
+    </div>
+  </section>
+</main>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  /* ===================== I18N ===================== */
+  const I18N = {
+    en:{
+      title:"ARGOS 6X – Capacity Planner",
+      subtitle:"Production demand · HE supply · SLA windows · Visual insights",
+      language:"Language",
+      secA:"A — Production volume (demand)",
+      volumeMode:"Volume input",
+      perDay:"Slides per day",
+      perYear:"Slides per year",
+      slidesPerDay:"Slides per day",
+      slidesPerYear:"Slides per year",
+      workdays:"Workdays per year",
+      hoursPerDay:"Scanning hours per day (h)",
+      hoursNote:"If SLA (last done) is set, it overrides this value.",
+      scanSpeed:"Scan speed per scanner (slides/h)",
+      kpiTarget:"Daily target rate",
+      kpiTargetHint:"Slides per hour to finish daily volume",
+      kpiDaily:"Scanners needed (daily)",
+      kpiDailyHint:"Based on daily volume",
+
+      secB:"B — Coverslipper output (HE supply)",
+      rackType:"Rack type",
+      railsUsed:"Rails used per scanner",
+      racksPerHour:"Racks per hour",
+      rackInterval:"Interval between racks (min)",
+      kpiSupplyRate:"Supply rate",
+      kpiSupplyScanners:"Scanners needed (supply)",
+      kpiSupplyScannersHint:"To absorb supply",
+
+      secC:"C — Optional SLAs (time windows)",
+      shiftStart:"Shift start",
+      firstDigitalBy:"First slide must be ready by (optional)",
+      lastDoneBy:"Last slide must be done by (optional)",
+      kpiSLARate:"SLA required rate",
+      kpiSLARateHint:"Only if 'last done by' is set",
+      kpiSLAScanners:"Scanners needed (SLA)",
+      kpiSLAScannersHint:"Based on SLA rate",
+      kpiFirstETA:"First digital ETA",
+
+      secResults:"Results",
+      kpiFleetRate:"Fleet scan rate (daily/SLA, slides/h)",
+      kpiRec:"Recommended scanners",
+      kpiLoadCap:"Load capacity / scanner",
+      kpiLoadCapHint:"Rails × 8 racks × slides/rack",
+      kpiEmpty:"Time until empty (from full)",
+      kpiLoadsPerDay:"Loads per day",
+
+      trafficLight:"Traffic light",
+      relBar:"Supply vs. fleet (relative)",
+      relNote:"100% = supply equals fleet scan rate (daily/SLA)",
+      printFull:"Print / Save PDF",
+      printSummary:"Print summary",
+      reset:"Reset",
+
+      secViz:"Visualization",
+      vizBars:"Bars — Supply vs. Fleet (slides/h)",
+      legendFleet:"Fleet rate",
+      legendSupply:"Supply rate",
+      vizDonut:"Gauge — Utilization (supply/fleet)",
+      vizTimeline:"Timeline — Cumulative supply vs. scan",
+      legendScanCum:"Cumulative scan",
+      legendSupplyCum:"Cumulative supply",
+      legendBacklog:"Backlog area",
+
+      secNotes:"Notes & consistency",
+      noSupply:"No supply input.",
+      basis:"Basis",
+      basisRacks:"racks/h",
+      basisInterval:"interval (min)",
+      stCheck:"Check inputs",
+      stBalanced:"Balanced supply & fleet",
+      stOversizedSlight:"Slightly oversized – watch supply",
+      stOversizedHard:"Oversized scanners – supply too low",
+      stTooFewSlight:"Borderline – consider one more scanner",
+      stTooFewHard:"Too few scanners – backlog"
+    },
+    de:{
+      title:"ARGOS 6X – Bedarfsrechner",
+      subtitle:"Gesamtbedarf · HE‑Supply · SLA‑Fenster · Visuelle Auswertungen",
+      language:"Sprache",
+      secA:"A — Gesamtproduktion (Bedarf)",
+      volumeMode:"Mengeneingabe",
+      perDay:"Objektträger pro Tag",
+      perYear:"Objektträger pro Jahr",
+      slidesPerDay:"Objektträger pro Tag",
+      slidesPerYear:"Objektträger pro Jahr",
+      workdays:"Arbeitstage pro Jahr",
+      hoursPerDay:"Scanzeit pro Tag (Std)",
+      hoursNote:"Wenn SLA (letzter fertig) gesetzt ist, überschreibt es diesen Wert.",
+      scanSpeed:"Scangeschwindigkeit je Scanner (Objektträger/Std)",
+      kpiTarget:"Zielrate pro Tag",
+      kpiTargetHint:"Objektträger/Std, um Tagesvolumen zu schaffen",
+      kpiDaily:"Benötigte Scanner (Tagesbedarf)",
+      kpiDailyHint:"Auf Basis Tagesvolumen",
+
+      secB:"B — Eindecker‑Output (HE‑Supply)",
+      rackType:"Rack‑Typ",
+      railsUsed:"Genutzte Schienen je Scanner",
+      racksPerHour:"Racks pro Stunde",
+      rackInterval:"Intervall zwischen Racks (Min)",
+      kpiSupplyRate:"Lieferrate",
+      kpiSupplyScanners:"Benötigte Scanner (Supply)",
+      kpiSupplyScannersHint:"Um die Supply aufzunehmen",
+
+      secC:"C — Optionale SLAs (Zeitfenster)",
+      shiftStart:"Schichtbeginn",
+      firstDigitalBy:"Erster Slide digital bis (optional)",
+      lastDoneBy:"Letzter Slide fertig bis (optional)",
+      kpiSLARate:"Erforderliche SLA‑Rate",
+      kpiSLARateHint:"Nur wenn 'letzter fertig' gesetzt ist",
+      kpiSLAScanners:"Benötigte Scanner (SLA)",
+      kpiSLAScannersHint:"Auf Basis SLA‑Rate",
+      kpiFirstETA:"ETA erster digitaler Slide",
+
+      secResults:"Ergebnisse",
+      kpiFleetRate:"Flotten‑Scanrate (Tages/SLA, Obj./Std)",
+      kpiRec:"Empfohlene Scanner",
+      kpiLoadCap:"Beladungskapazität / Scanner",
+      kpiLoadCapHint:"Schienen × 8 Racks × Obj./Rack",
+      kpiEmpty:"Zeit bis leer (ab Vollbeladung)",
+      kpiLoadsPerDay:"Beladungen pro Tag",
+
+      trafficLight:"Ampel",
+      relBar:"Supply vs. Flotte (relativ)",
+      relNote:"100% = Supply entspricht Flotten‑Scanrate (Tages/SLA)",
+      printFull:"Drucken / als PDF speichern",
+      printSummary:"Kurzfassung drucken",
+      reset:"Zurücksetzen",
+
+      secViz:"Visualisierung",
+      vizBars:"Balken — Supply vs. Flotte (Obj./Std)",
+      legendFleet:"Flottenrate",
+      legendSupply:"Lieferrate",
+      vizDonut:"Gauge — Auslastung (Supply/Flotte)",
+      vizTimeline:"Zeitstrahl — Kumulierte Supply vs. Scan",
+      legendScanCum:"Kumuliert Scan",
+      legendSupplyCum:"Kumuliert Supply",
+      legendBacklog:"Rückstau‑Bereich",
+
+      secNotes:"Hinweise & Konsistenz",
+      noSupply:"Keine Supply‑Angabe.",
+      basis:"Basis",
+      basisRacks:"Racks/Std",
+      basisInterval:"Intervall (Min)",
+      stCheck:"Eingaben prüfen",
+      stBalanced:"Supply & Flotte im Gleichgewicht",
+      stOversizedSlight:"Leicht überdimensioniert – Supply beobachten",
+      stOversizedHard:"Überdimensioniert – Supply zu niedrig",
+      stTooFewSlight:"Grenzbereich – evtl. ein Scanner mehr",
+      stTooFewHard:"Zu wenige Scanner – Rückstau"
+    }
+  };
+
+  let lang = "en";
+  const $ = id => document.getElementById(id);
+  const t = key => I18N[lang][key] || key;
+  const nf = () => lang==="de" ? "de-DE" : "en-US";
+  const unitSlides = () => lang==="de" ? "Objektträger" : "slides";
+  const unitPerHour = () => lang==="de" ? "/Std" : "/h";
+  const unitHours = () => lang==="de" ? "Std" : "h";
+
+  function setTexts(){
+    document.querySelectorAll("[data-i18n]").forEach(el=>{
+      const key = el.getAttribute("data-i18n");
+      el.innerHTML = t(key);
+    });
+  }
+
+  /* ============ Utils ============ */
+  function readNumber(id){
+    const el = $(id);
+    if(!el) return 0;
+    const raw = String(el.value ?? "").trim().replace(",",".");
+    const v = parseFloat(raw);
+    return isNaN(v)?0:v;
+  }
+  function readTime(id){ // returns minutes since midnight or null
+    const el = $(id); if(!el || !el.value) return null;
+    const [hh,mm] = el.value.split(":").map(x=>parseInt(x,10));
+    if(isNaN(hh)||isNaN(mm)) return null;
+    return hh*60+mm;
+  }
+  function fmt(n, unit=""){
+    if(typeof n!=="number"||isNaN(n)) return "–";
+    return n.toLocaleString(nf(),{maximumFractionDigits:2}) + (unit?" "+unit:"");
+  }
+  const fmtH = n => fmt(n, unitHours());
+  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+
+  /* ====== Core calc ====== */
+  function calc(){
+    // A) Volume
+    const volumeMode = $("volumeMode").value;
+    let slidesPerDay = 0;
+    if(volumeMode==="day"){
+      slidesPerDay = readNumber("slidesPerDay");
+    } else {
+      const y = readNumber("slidesPerYear");
+      const wd = readNumber("workdaysPerYear");
+      slidesPerDay = (wd>0)? (y/wd) : 0;
+    }
+
+    // Hours/day from SLA if set
+    const shiftStartMin = readTime("shiftStart");          // minutes
+    const lastDoneMin = readTime("lastDoneBy");            // minutes or null
+    let hoursPerDay = readNumber("hoursPerDay");
+    let slaRate = 0, scannersSLA = 0, slaNote = "";
+    if(shiftStartMin!=null && lastDoneMin!=null){
+      const windowMin = lastDoneMin - shiftStartMin;
+      if(windowMin>0){
+        hoursPerDay = windowMin/60;
+        slaRate = (hoursPerDay>0) ? (slidesPerDay / hoursPerDay) : 0;
+        scannersSLA = (readNumber("scanSpeed")>0) ? Math.ceil(slaRate/readNumber("scanSpeed")) : 0;
+      } else {
+        slaNote = (lang==="de") ? "⚠ Zeitfenster ungültig (Ende vor Start)." : "⚠ Invalid window (end before start).";
+      }
+    }
+
+    const scanSpeed = readNumber("scanSpeed");
+    const targetRate = (hoursPerDay>0)? (slidesPerDay / hoursPerDay) : 0;
+    const scannersDaily = (scanSpeed>0 && hoursPerDay>0) ? Math.ceil(slidesPerDay / (scanSpeed*hoursPerDay)) : 0;
+
+    // B) Supply
+    const rackType = $("rackType").value;
+    const slidesPerRack = (rackType==="Leica")?30:20;
+    const racksPerHour = readNumber("racksPerHour");
+    const rackInterval = readNumber("rackInterval");
+    const supplyFromRacks = racksPerHour * slidesPerRack;
+    const supplyFromInterval = rackInterval>0 ? (60/rackInterval)*slidesPerRack : 0;
+    const supplyRate = Math.max(supplyFromRacks, supplyFromInterval);
+    const supplyBasis = (supplyRate===0)? t("noSupply")
+                        : (supplyRate===supplyFromRacks? t("basis")+": "+t("basisRacks") : t("basis")+": "+t("basisInterval"));
+
+    // Supply scanners
+    const scannersSupply = (scanSpeed>0) ? Math.ceil(supplyRate/scanSpeed) : 0;
+
+    // Fleet basis for ampel: based on max(targetRate, slaRate)
+    const basisRate = Math.max(targetRate, slaRate||0);
+    const baseScanners = (scanSpeed>0) ? Math.ceil(basisRate/scanSpeed) : 0;
+    const fleetRate = baseScanners * scanSpeed;
+
+    // Recommendation
+    const scannersRecommended = Math.max(scannersDaily, scannersSupply, scannersSLA||0);
+
+    // D) Loading & buffer
+    const railsUsed = parseInt($("railsUsed").value,10) || 0;
+    const racksPerRail = 8;
+    const loadCapacity = railsUsed * racksPerRail * slidesPerRack;
+    const emptyAfter = (scanSpeed>0)? (loadCapacity/scanSpeed) : 0;
+    const loadsPerDay = (loadCapacity>0)? Math.ceil(slidesPerDay/loadCapacity) : 0;
+
+    // SLA First digital ETA (simple)
+    const firstByMin = readTime("firstDigitalBy");
+    let firstETAtext = "–", firstETAhint = "–";
+    if(shiftStartMin!=null){
+      const etaMin = shiftStartMin + Math.round((1/Math.max(scanSpeed,1))*60);
+      const hh = Math.floor((etaMin%1440)/60).toString().padStart(2,"0");
+      const mm = Math.floor((etaMin%60)).toString().padStart(2,"0");
+      firstETAtext = `${hh}:${mm}`;
+      if(firstByMin!=null){
+        const ok = etaMin<=firstByMin;
+        firstETAhint = ok ? (lang==="de"?"✔ SLA erreicht":"✔ SLA met")
+                          : (lang==="de"?"⚠ SLA verfehlt":"⚠ SLA not met");
+      } else {
+        firstETAhint = (lang==="de"?"(ohne Sollzeit)":"(no target set)");
+      }
+    }
+
+    // Consistency note for supply inputs
+    let consistency = "";
+    if(supplyFromRacks>0 && supplyFromInterval>0){
+      const diff = Math.abs(supplyFromRacks - supplyFromInterval);
+      const relDiff = (diff/Math.max(supplyFromRacks,supplyFromInterval))*100;
+      consistency = (relDiff>10)
+        ? (lang==="de"
+            ? `⚠ Abweichende Supply‑Angaben: ${fmt(supplyFromRacks,unitSlides()+unitPerHour())} (Racks/Std) vs. ${fmt(supplyFromInterval,unitSlides()+unitPerHour())} (Intervall).`
+            : `⚠ Diverging supply inputs: ${fmt(supplyFromRacks,unitSlides()+unitPerHour())} (racks/h) vs. ${fmt(supplyFromInterval,unitSlides()+unitPerHour())} (interval).`)
+        : (lang==="de"
+            ? `✔ Supply‑Angaben konsistent (~${relDiff.toFixed(1)}% Differenz).`
+            : `✔ Supply inputs consistent (~${relDiff.toFixed(1)}% diff).`);
+    } else {
+      consistency = (lang==="de"
+        ? "ℹ Trage Racks/Std und Intervall ein, um eine Konsistenzprüfung zu erhalten."
+        : "ℹ Enter both racks/h and interval to get a consistency check.");
+    }
+    if(slaNote) consistency += "  " + slaNote;
+
+    // Ampel
+    let status = t("stCheck"), cls="yellow", rel=0;
+    if(fleetRate>0){
+      rel = supplyRate/fleetRate;
+      if(rel>=0.9 && rel<=1.1){ status=t("stBalanced"); cls="green"; }
+      else if(rel<0.9){ status=(rel<0.6)?t("stOversizedHard"):t("stOversizedSlight"); cls=(rel<0.6)?"red":"yellow"; }
+      else { status=(rel>1.3)?t("stTooFewHard"):t("stTooFewSlight"); cls=(rel>1.3)?"red":"yellow"; }
+    }
+
+    /* ====== Update UI ====== */
+    // A
+    $("targetRate").textContent = fmt(targetRate, unitSlides()+unitPerHour());
+    $("scannersDaily").textContent = String(scannersDaily);
+
+    // B
+    $("supplyRate").textContent = fmt(supplyRate, unitSlides()+unitPerHour());
+    $("supplyBasis").textContent = supplyBasis;
+    $("scannersSupply").textContent = String(scannersSupply);
+
+    // C
+    $("slaRate").textContent = slaRate? fmt(slaRate, unitSlides()+unitPerHour()) : "–";
+    $("scannersSLA").textContent = (scannersSLA||0) ? String(scannersSLA) : "–";
+    $("firstETA").textContent = firstETAtext;
+    $("firstETAhint").textContent = firstETAhint;
+    $("slaNote").textContent = (lastDoneMin!=null) ? ((lang==="de")?"SLA aktiv (Letzter fertig)":"SLA active (last done)") : ((lang==="de")?"SLA nicht gesetzt":"SLA not set");
+
+    // Results
+    $("fleetRate").textContent = fmt(fleetRate, unitSlides()+unitPerHour());
+    $("fleetBasis").textContent = (basisRate>0) ? ((lang==="de")?"Basis: Tages-/SLA‑Zielrate":"Basis: daily/SLA target rate") : "–";
+    $("scannersRecommended").textContent = String(scannersRecommended);
+    const driver = scannersRecommended===scannersSLA && scannersSLA>0 ? (lang==="de"?"Treiber: SLA":"Driver: SLA")
+                  : scannersRecommended===scannersSupply ? (lang==="de"?"Treiber: Supply":"Driver: Supply")
+                  : (lang==="de"?"Treiber: Tagesbedarf":"Driver: Daily");
+    $("recHint").textContent = driver;
+
+    $("loadCap").textContent = fmt(loadCapacity, unitSlides());
+    $("emptyAfter").textContent = fmtH(+emptyAfter.toFixed(2));
+    $("loadsPerDay").textContent = String(loadsPerDay);
+
+    // Ampel
+    $("statusMsg").textContent = status;
+    const dot = $("dot"); dot.className = "dot "+cls;
+    $("barFill").style.width = (fleetRate>0) ? (clamp(rel,0,1.3)*100).toFixed(0)+"%" : "0%";
+
+    // Consistency
+    $("consistency").textContent = consistency;
+
+    // Badge SLA
+    $("badgeSLA").style.display = (slaRate && slaRate>=targetRate) ? "inline-block" : "none";
+
+    // Visuals
+    drawBars(supplyRate, fleetRate);
+    drawDonut(rel);
+    const shiftEndMin = (shiftStartMin!=null) ? (shiftStartMin + Math.round(hoursPerDay*60)) : null;
+    drawTimeline(shiftStartMin, shiftEndMin, supplyRate, fleetRate);
+    $("timelineLabel").textContent = (shiftStartMin!=null && shiftEndMin!=null)
+      ? timeLabel(shiftStartMin)+"–"+timeLabel(shiftEndMin)
+      : (lang==="de"?"Zeitfenster nicht gesetzt":"Time window not set");
+  }
+
+  /* ====== Visuals (pure SVG) ====== */
+  function drawBars(supplyRate, fleetRate){
+    const svg = $("svgBars");
+    const W=700,H=260, pad=40, barH=36, gap=30;
+    svg.innerHTML="";
+    const maxVal = Math.max(supplyRate, fleetRate, 1);
+    const scale = (W - pad*2) / (maxVal*1.3);
+
+    // Axes line
+    line(svg, pad, H-60, W-pad, H-60, "#cfd8e3", 1);
+
+    // Bars
+    const yFleet = 70, ySupply = yFleet + barH + gap;
+    const fleetW = fleetRate*scale, supplyW = supplyRate*scale;
+
+    rect(svg, pad, yFleet, fleetW, barH, "url(#gradFleet)", 6);
+    rect(svg, pad, ySupply, supplyW, barH, "url(#gradSupply)", 6);
+
+    text(svg, pad, yFleet-8, t("legendFleet")+": "+fmt(fleetRate, unitSlides()+unitPerHour()), "#1b2a3a", 12);
+    text(svg, pad, ySupply-8, t("legendSupply")+": "+fmt(supplyRate, unitSlides()+unitPerHour()), "#1b2a3a", 12);
+
+    // Gradients
+    const defs = create(svg,"defs");
+    const gf = create(defs,"linearGradient"); gf.id="gradFleet"; gf.setAttribute("x1","0"); gf.setAttribute("x2","1");
+    stop(gf,"0%","var(--brand-dark)"); stop(gf,"100%","var(--brand)");
+    const gs = create(defs,"linearGradient"); gs.id="gradSupply"; gs.setAttribute("x1","0"); gs.setAttribute("x2","1");
+    stop(gs,"0%","#76bada"); stop(gs,"100%","#a5d6ea");
+
+    // Ticks (0%, 50%, 100%)
+    for(let p of [0,0.5,1]){
+      const x = pad + (maxVal*1.3)*scale*p;
+      line(svg, x, H-64, x, H-56, "#cfd8e3", 1);
+    }
+  }
+
+  function drawDonut(rel){
+    const svg = $("svgDonut");
+    const W=260,H=260,cx=130,cy=130,r=90;
+    svg.innerHTML="";
+    // background ring
+    arc(svg,cx,cy,r,0,Math.PI*2,"#eef3f8",18);
+
+    // color by bands
+    const v = Math.max(0, Math.min(rel,1.5)); // 0..1.5
+    const angle = v/1.5 * Math.PI*2 * 0.75; // span 270°
+    const start = -Math.PI*0.75; // start at 7:30 on a clock
+    const end = start + angle;
+    const color = rel>=0.9&&rel<=1.1 ? "var(--green)"
+                 : (rel<0.6||rel>1.3) ? "var(--red)" : "var(--yellow)";
+    arc(svg,cx,cy,r,start,end,color,18);
+
+    // needle
+    const nEnd = polar(cx,cy,r,start + (Math.max(0,Math.min(rel,1.5))/1.5)*Math.PI*2*0.75);
+    line(svg,cx,cy,nEnd.x,nEnd.y,color,3);
+    circle(svg,cx,cy,4,"#667");
+
+    // label
+    const label = rel ? (rel*100).toFixed(0)+"%" : "–";
+    text(svg,cx,cy+6,label,"#1b2a3a",22,"middle");
+    const status = (rel===0)? t("stCheck")
+                 : (rel>=0.9&&rel<=1.1)? t("stBalanced")
+                 : (rel<0.9)? ((rel<0.6)?t("stOversizedHard"):t("stOversizedSlight"))
+                 : ((rel>1.3)?t("stTooFewHard"):t("stTooFewSlight"));
+    text(svg,cx,cy+28,status,"#6b7a8c",12,"middle");
+  }
+
+  function drawTimeline(startMin, endMin, supplyRate, fleetRate){
+    const svg = $("svgTimeline");
+    const W=700,H=260,pad=40;
+    svg.innerHTML="";
+    if(startMin==null || endMin==null || endMin<=startMin){
+      text(svg, W/2, H/2, (lang==="de"?"Kein gültiges Zeitfenster":"No valid time window"), "#a33", 14,"middle");
+      return;
+    }
+    const durMin = endMin - startMin;
+    const steps = Math.min(200, Math.ceil(durMin/5)); // ≤200 points
+    const toX = m => pad + (m/durMin)*(W-2*pad);
+    const maxYVal = Math.max(supplyRate, fleetRate) * (durMin/60);
+    const toY = v => H - pad - (v/maxYVal)*(H-2*pad);
+
+    // Axes
+    line(svg, pad, H-pad, W-pad, H-pad, "#cfd8e3", 1);
+    line(svg, pad, pad, pad, H-pad, "#cfd8e3", 1);
+
+    // Curves (polyline)
+    const ptsScan=[], ptsSupply=[];
+    for(let i=0;i<=steps;i++){
+      const m = (durMin*i)/steps;
+      const tH = m/60;
+      ptsScan.push({x:toX(m), y:toY(fleetRate*tH)});
+      ptsSupply.push({x:toX(m), y:toY(supplyRate*tH)});
+    }
+    poly(svg, ptsScan, "var(--brand-dark)", 2);
+    poly(svg, ptsSupply, "var(--brand)", 2);
+
+    // Fill area where Supply > Scan (backlog)
+    const area = [];
+    for(let i=0;i<=steps;i++){
+      const m = (durMin*i)/steps, tH=m/60;
+      const yS = toY(fleetRate*tH);
+      const yP = toY(supplyRate*tH);
+      if(yP<yS){ // supply above scan -> backlog area between curves
+        area.push({x:toX(m), y1:yS, y2:yP});
+      }
+    }
+    if(area.length){
+      // simple vertical strips
+      area.forEach(seg=>{
+        rect(svg, seg.x, seg.y2, 2, seg.y1-seg.y2, "rgba(218,61,42,0.12)", 0);
+      });
+    }
+
+    // SLA markers
+    const firstBy = readTime("firstDigitalBy");
+    if(firstBy!=null && firstBy>=startMin && firstBy<=endMin){
+      const x = toX(firstBy-startMin);
+      line(svg,x,pad,x,H-pad,"#8884",1);
+      text(svg,x,pad-6,(lang==="de"?"First digital":"First digital"),"#6b7a8c",11,"middle");
+    }
+    const lastBy = readTime("lastDoneBy");
+    if(lastBy!=null && lastBy>=startMin && lastBy<=endMin){
+      const x = toX(lastBy-startMin);
+      line(svg,x,pad,x,H-pad,"#8884",1.2);
+      text(svg,x,pad-6,(lang==="de"?"Last done":"Last done"),"#6b7a8c",11,"middle");
+    }
+
+    // Ticks: start/end labels
+    text(svg, pad, H-pad+14, timeLabel(startMin), "#6b7a8c", 12);
+    text(svg, W-pad, H-pad+14, timeLabel(endMin), "#6b7a8c", 12, "end");
+  }
+
+  // SVG helpers
+  function create(svg,tag){ const el=document.createElementNS("http://www.w3.org/2000/svg",tag); svg.appendChild(el); return el; }
+  function line(svg,x1,y1,x2,y2,stroke,w){ const e=create(svg,"line"); e.setAttribute("x1",x1); e.setAttribute("y1",y1); e.setAttribute("x2",x2); e.setAttribute("y2",y2); e.setAttribute("stroke",stroke); e.setAttribute("stroke-width",w); }
+  function rect(svg,x,y,w,h,fill,r){ const e=create(svg,"rect"); e.setAttribute("x",x); e.setAttribute("y",y); e.setAttribute("width",Math.max(0,w)); e.setAttribute("height",Math.max(0,h)); e.setAttribute("fill",fill); if(r)e.setAttribute("rx",r); }
+  function text(svg,x,y,str,fill,sz,anchor){ const e=create(svg,"text"); e.setAttribute("x",x); e.setAttribute("y",y); e.setAttribute("fill",fill); e.setAttribute("font-size",sz); if(anchor) e.setAttribute("text-anchor",anchor); e.textContent=str; }
+  function poly(svg,pts,stroke,w){ const e=create(svg,"polyline"); e.setAttribute("fill","none"); e.setAttribute("stroke",stroke); e.setAttribute("stroke-width",w); e.setAttribute("points", pts.map(p=>`${p.x},${p.y}`).join(" ")); }
+  function circle(svg,cx,cy,r,fill){ const e=create(svg,"circle"); e.setAttribute("cx",cx); e.setAttribute("cy",cy); e.setAttribute("r",r); e.setAttribute("fill",fill); }
+  function stop(grad,off,color){ const s=document.createElementNS("http://www.w3.org/2000/svg","stop"); s.setAttribute("offset",off); s.setAttribute("stop-color",color); grad.appendChild(s); }
+  function arc(svg,cx,cy,r,start,end,stroke,w){
+    const e=create(svg,"path");
+    const startXY = polar(cx,cy,r,start), endXY = polar(cx,cy,r,end);
+    const large = (end-start) > Math.PI ? 1 : 0;
+    const d = `M ${startXY.x} ${startXY.y} A ${r} ${r} 0 ${large} 1 ${endXY.x} ${endXY.y}`;
+    e.setAttribute("d",d); e.setAttribute("fill","none"); e.setAttribute("stroke",stroke); e.setAttribute("stroke-width",w);
+  }
+  function polar(cx,cy,r,ang){ return {x: cx + r*Math.cos(ang), y: cy + r*Math.sin(ang)}; }
+  function timeLabel(mins){
+    const hh=Math.floor((mins%1440)/60).toString().padStart(2,"0");
+    const mm=Math.floor(mins%60).toString().padStart(2,"0");
+    return `${hh}:${mm}`;
+  }
+
+  /* ====== Events ====== */
+  function bindInputs(){
+    const ids=["volumeMode","slidesPerDay","slidesPerYear","workdaysPerYear","hoursPerDay","scanSpeed","rackType","railsUsed","racksPerHour","rackInterval","shiftStart","firstDigitalBy","lastDoneBy"];
+    ids.forEach(id=>{
+      const el=$(id); if(!el) return;
+      el.addEventListener("input",calc);
+      el.addEventListener("change",calc);
+    });
+
+    // Volume mode toggle group visibility
+    $("volumeMode").addEventListener("change",()=>{
+      const m=$("volumeMode").value;
+      $("grpSlidesPerDay").style.display = (m==="day")?"block":"none";
+      $("grpSlidesPerYear").style.display = (m==="year")?"block":"none";
+      $("grpWorkdays").style.display = (m==="year")?"block":"none";
+      calc();
+    });
+
+    // Print buttons
+    $("btnPrint").addEventListener("click",()=>{
+      document.body.classList.remove("print-summary");
+      window.print();
+    });
+    $("btnPrintSummary").addEventListener("click",()=>{
+      document.body.classList.add("print-summary");
+      window.print();
+      // Revert after print
+      setTimeout(()=>document.body.classList.remove("print-summary"),1000);
+    });
+
+    $("btnReset").addEventListener("click",()=>{
+      $("volumeMode").value="day";
+      $("slidesPerDay").value=2000;
+      $("slidesPerYear").value=480000;
+      $("workdaysPerYear").value=240;
+      $("hoursPerDay").value=10;
+      $("scanSpeed").value=110;
+      $("rackType").value="Sakura";
+      $("railsUsed").value=3;
+      $("racksPerHour").value=4;
+      $("rackInterval").value=15;
+      $("shiftStart").value="07:00";
+      $("firstDigitalBy").value="";
+      $("lastDoneBy").value="";
+      $("grpSlidesPerDay").style.display="block";
+      $("grpSlidesPerYear").style.display="none";
+      $("grpWorkdays").style.display="none";
+      calc();
+    });
+
+    $("langSelect").addEventListener("change", e=>{
+      lang = e.target.value;
+      try{ localStorage.setItem("argos_lang", lang);}catch(e){}
+      setTexts(); calc();
+      document.documentElement.lang = lang;
+      document.title = t("title");
+    });
+  }
+
+  // Load saved language
+  try{ const saved=localStorage.getItem("argos_lang"); if(saved) lang=saved; }catch(e){}
+  setTexts(); bindInputs(); calc();
+});
+</script>
+</body>
+</html>
